@@ -17,5 +17,17 @@ services:
     ports:
       - "6379:6379"
 
+  # Sentinel AI app (for local Docker-based testing)
+  # app:
+  #   build: .
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     DATABASE_URL: postgresql://postgres:postgres@postgres:5432/sentinel_ai
+  #     REDIS_URL: redis://redis:6379
+  #   depends_on:
+  #     - postgres
+  #     - redis
+
 volumes:
   postgres_data:

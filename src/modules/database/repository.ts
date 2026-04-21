@@ -1,28 +1,27 @@
 import type { AnalysisResult, TransactionPayload } from "@/src/modules/transaction/types";
 
-// Try SQLite first, fall back to in-memory
-let useSqlite = false;
-let sqliteModule: typeof import("./sqlite") | null = null;
-
-try {
-  sqliteModule = require("./sqlite");
-  useSqlite = true;
-} catch {
-  // SQLite not available (e.g., edge runtime), use in-memory
-}
-
 const memoryLog: Array<{ payload: TransactionPayload; result: AnalysisResult }> = [];
 const memoryNullifiers = new Set<string>();
 const memoryFeedback: Array<{ actorAddress: string; verdict: string; notes?: string }> = [];
+
+async function getPgModule() {
+  if (!process.env.DATABASE_URL) return null;
+  try {
+    return await import("./postgres");
+  } catch {
+    return null;
+  }
+}
 
 export async function recordAnalysis(
   payload: TransactionPayload,
   result: AnalysisResult,
   actorAddress?: string
 ) {
-  if (useSqlite && sqliteModule) {
+  const pgModule = await getPgModule();
+  if (pgModule) {
     try {
-      sqliteModule.insertAnalysis(
+      await pgModule.insertAnalysis(
         "",
         { chainId: payload.chainId, from: payload.from, to: payload.to },
         { severity: result.severity, verdict: result.verdict, score: result.score, decoded: result.decoded },
@@ -49,9 +48,10 @@ export async function consumeNullifier(nullifier: string, _policy: string) {
 }
 
 export async function recordFeedback(actorAddress: string, verdict: string, notes?: string) {
-  if (useSqlite && sqliteModule) {
+  const pgModule = await getPgModule();
+  if (pgModule) {
     try {
-      sqliteModule.insertFeedback(null, actorAddress, verdict, notes);
+      await pgModule.insertFeedback(null, actorAddress, verdict, notes);
       return;
     } catch {
       // Fall through to memory
@@ -61,10 +61,11 @@ export async function recordFeedback(actorAddress: string, verdict: string, note
   memoryFeedback.push({ actorAddress, verdict, notes });
 }
 
-export function getFeedbackCount() {
-  if (useSqlite && sqliteModule) {
+export async function getFeedbackCount() {
+  const pgModule = await getPgModule();
+  if (pgModule) {
     try {
-      return sqliteModule.getFeedbackCountDb();
+      return await pgModule.getFeedbackCountDb();
     } catch {
       // Fall through
     }

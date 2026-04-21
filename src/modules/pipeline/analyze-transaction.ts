@@ -57,7 +57,7 @@ export async function analyzeTransaction(
         ...parsed.telemetry,
         cached: true,
         liveRpc: chainContext.source === "rpc",
-        feedbackCount: getFeedbackCount(),
+        feedbackCount: await getFeedbackCount(),
         authMode: "wallet-signature",
         rateLimitMode: "memory"
       }
@@ -173,7 +173,7 @@ export async function analyzeTransaction(
       usedOpenAI: explanation.usedOpenAI,
       liveRpc: chainContext.source === "rpc",
       cached: false,
-      feedbackCount: getFeedbackCount(),
+      feedbackCount: await getFeedbackCount(),
       authMode: "wallet-signature",
       rateLimitMode: "memory"
     }

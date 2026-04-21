@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { motion } from "framer-motion";
+
 import {
   ArrowRight,
   BrainCircuit,
@@ -227,14 +227,14 @@ export default function HomePage() {
 
             <Reveal direction="right" delay={0.15}>
               <div className="rounded-2xl border border-primary/15 bg-white/[0.02] p-6 font-mono text-[13px] leading-7 shadow-[0_0_40px_rgba(0,240,255,0.06)] ring-1 ring-primary/[0.08]">
-                <div className="text-white/20 mb-4 text-xs">// What your wallet shows</div>
+                <div className="text-white/20 mb-4 text-xs">{/* What your wallet shows */}</div>
                 <div className="space-y-1.5 text-white/40">
                   <div><span className="text-danger/60">to:</span> 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D</div>
                   <div><span className="text-danger/60">data:</span> 0x095ea7b3000000000000000000000000...</div>
                   <div><span className="text-danger/60">value:</span> 0</div>
                 </div>
                 <div className="my-5 border-t border-white/[0.04]" />
-                <div className="text-primary/40 mb-4 text-xs">// What Sentinel reveals</div>
+                <div className="text-primary/40 mb-4 text-xs">{/* What Sentinel reveals */}</div>
                 <div className="space-y-2">
                   <div className="text-warning/80">⚠ UNLIMITED approval to unknown contract</div>
                   <div className="text-danger/80">⛔ Contract deployed 2 hours ago</div>
@@ -261,7 +261,7 @@ export default function HomePage() {
           </Reveal>
 
           <StaggerContainer className="grid md:grid-cols-2 gap-4" stagger={0.1}>
-            {pillars.map((pillar, i) => (
+            {pillars.map((pillar, _i) => (
               <StaggerItem key={pillar.title}>
                 <GlowCard>
                   <div className={`absolute inset-0 bg-gradient-to-br ${pillar.gradient}`} />
@@ -317,7 +317,7 @@ export default function HomePage() {
                 title: "Attest",
                 text: "The verdict is sealed with ML-DSA-65 Post-Quantum signatures and anchored with Poseidon nullifiers for replay protection.",
               },
-            ].map((item, i) => (
+            ].map((item, _i) => (
               <StaggerItem key={item.step}>
                 <GlowCard className="h-full">
                   <div className="p-7 h-full flex flex-col">

@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   }
 
   const body = schema.parse(await request.json());
-  const token = verifyWalletSignature(body.address, body.signature);
+  const token = await verifyWalletSignature(body.address, body.signature);
 
   if (!token) {
     return NextResponse.json({ error: "Signature verification failed" }, { status: 401 });

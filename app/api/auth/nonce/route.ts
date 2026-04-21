@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   }
 
   const body = schema.parse(await request.json());
-  const nonce = issueNonce(body.address);
+  const nonce = await issueNonce(body.address);
   return NextResponse.json({
     nonce,
     message: `Sentinel AI authentication nonce: ${nonce}`

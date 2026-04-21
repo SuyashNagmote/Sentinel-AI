@@ -1,15 +1,16 @@
 import { createHmac, randomUUID, timingSafeEqual } from "crypto";
 import { verifyMessage } from "ethers";
 
-// Try SQLite-backed nonces, fall back to in-memory
-let sqliteNonces: typeof import("../database/sqlite") | null = null;
-try {
-  sqliteNonces = require("../database/sqlite");
-} catch {
-  // SQLite not available
-}
-
 const memoryNonces = new Map<string, { nonce: string; expiresAt: number; issuedAt: number }>();
+
+async function getPgNonces() {
+  if (!process.env.DATABASE_URL) return null;
+  try {
+    return await import("../database/postgres");
+  } catch {
+    return null;
+  }
+}
 
 function tokenSecret() {
   return process.env.AUTH_SECRET ?? "sentinel-auth-secret";
@@ -47,14 +48,15 @@ export function verifyToken(token: string) {
   }
 }
 
-export function issueNonce(address: string) {
+export async function issueNonce(address: string) {
   const nonce = randomUUID();
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
-  // Persist to SQLite if available
-  if (sqliteNonces) {
+  // Persist to PostgreSQL if available
+  const pgNonces = await getPgNonces();
+  if (pgNonces) {
     try {
-      sqliteNonces.storeNonce(address, nonce, expiresAt);
+      await pgNonces.storeNonce(address, nonce, expiresAt);
       return nonce;
     } catch { /* fall through */ }
   }
@@ -67,18 +69,19 @@ export function issueNonce(address: string) {
   return nonce;
 }
 
-export function verifyWalletSignature(address: string, signature: string) {
+export async function verifyWalletSignature(address: string, signature: string) {
   let nonce: string | null = null;
 
-  // Try SQLite first
-  if (sqliteNonces) {
+  // Try PostgreSQL first
+  const pgNonces = await getPgNonces();
+  if (pgNonces) {
     try {
-      nonce = sqliteNonces.getNonce(address);
+      nonce = await pgNonces.getNonce(address);
       if (nonce) {
         const message = `Sentinel AI authentication nonce: ${nonce}`;
         const recovered = verifyMessage(message, signature);
         if (recovered.toLowerCase() !== address.toLowerCase()) return null;
-        sqliteNonces.deleteNonce(address);
+        await pgNonces.deleteNonce(address);
         return signToken(address, nonce);
       }
     } catch { /* fall through */ }
