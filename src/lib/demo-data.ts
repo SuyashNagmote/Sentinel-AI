@@ -40,7 +40,7 @@ export const demoTransactions = [
       to: "0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
       value: "0",
       data: erc20.encodeFunctionData("approve", [
-        "0xDeaDDeAdDeAdDeAdDeAdDeAdDeAdDeAdDeAd0001",
+        "0xdeaddeaddeaddeaddeaddeaddeaddeaddead0001",
         MaxUint256
       ]),
       tokenSymbol: "USDC",

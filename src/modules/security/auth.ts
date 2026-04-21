@@ -1,13 +1,15 @@
 import { createHmac, randomUUID, timingSafeEqual } from "crypto";
 import { verifyMessage } from "ethers";
 
-type NonceRecord = {
-  nonce: string;
-  expiresAt: number;
-  issuedAt: number;
-};
+// Try SQLite-backed nonces, fall back to in-memory
+let sqliteNonces: typeof import("../database/sqlite") | null = null;
+try {
+  sqliteNonces = require("../database/sqlite");
+} catch {
+  // SQLite not available
+}
 
-const nonces = new Map<string, NonceRecord>();
+const memoryNonces = new Map<string, { nonce: string; expiresAt: number; issuedAt: number }>();
 
 function tokenSecret() {
   return process.env.AUTH_SECRET ?? "sentinel-auth-secret";
@@ -21,9 +23,9 @@ function safeEquals(left: string, right: string) {
 }
 
 function signToken(address: string, nonce: string) {
-  const secret = process.env.AUTH_SECRET ?? "sentinel-auth-secret";
+  const secret = tokenSecret();
   const issuedAt = Date.now();
-  const expiresAt = issuedAt + 1000 * 60 * 60;
+  const expiresAt = issuedAt + 1000 * 60 * 60; // 1 hour
   const sessionId = randomUUID();
   const payload = `${address}:${issuedAt}:${expiresAt}:${sessionId}:${nonce}`;
   const signature = createHmac("sha256", secret).update(payload).digest("hex");
@@ -47,22 +49,49 @@ export function verifyToken(token: string) {
 
 export function issueNonce(address: string) {
   const nonce = randomUUID();
-  nonces.set(address.toLowerCase(), {
+  const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+  // Persist to SQLite if available
+  if (sqliteNonces) {
+    try {
+      sqliteNonces.storeNonce(address, nonce, expiresAt);
+      return nonce;
+    } catch { /* fall through */ }
+  }
+
+  memoryNonces.set(address.toLowerCase(), {
     nonce,
-    expiresAt: Date.now() + 5 * 60 * 1000,
+    expiresAt: expiresAt.getTime(),
     issuedAt: Date.now()
   });
   return nonce;
 }
 
 export function verifyWalletSignature(address: string, signature: string) {
-  const record = nonces.get(address.toLowerCase());
+  let nonce: string | null = null;
+
+  // Try SQLite first
+  if (sqliteNonces) {
+    try {
+      nonce = sqliteNonces.getNonce(address);
+      if (nonce) {
+        const message = `Sentinel AI authentication nonce: ${nonce}`;
+        const recovered = verifyMessage(message, signature);
+        if (recovered.toLowerCase() !== address.toLowerCase()) return null;
+        sqliteNonces.deleteNonce(address);
+        return signToken(address, nonce);
+      }
+    } catch { /* fall through */ }
+  }
+
+  // Fall back to in-memory
+  const record = memoryNonces.get(address.toLowerCase());
   if (!record || record.expiresAt < Date.now()) return null;
 
   const message = `Sentinel AI authentication nonce: ${record.nonce}`;
   const recovered = verifyMessage(message, signature);
   if (recovered.toLowerCase() !== address.toLowerCase()) return null;
 
-  nonces.delete(address.toLowerCase());
+  memoryNonces.delete(address.toLowerCase());
   return signToken(address, record.nonce);
 }

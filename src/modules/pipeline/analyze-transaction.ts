@@ -11,8 +11,10 @@ import { evaluateRisk } from "@/src/modules/risk/engine";
 import { signAnalysisResult } from "@/src/modules/security/integrity";
 import { buildSigningPreview } from "@/src/modules/signing/service";
 import { simulateTransaction } from "@/src/modules/simulation/service";
+import { getAddressThreatIntel } from "@/src/modules/threat-intel/goplus";
 import { transactionPayloadSchema } from "@/src/modules/transaction/schema";
-import type { AnalysisResult, TransactionPayload } from "@/src/modules/transaction/types";
+import type { AnalysisResult, RiskFinding, TransactionPayload } from "@/src/modules/transaction/types";
+import { insertLeaf, getMerklePath } from "@/src/modules/zk/merkle";
 import { recordComplianceAttestation } from "@/src/modules/zk/service";
 
 function cacheKey(payload: TransactionPayload, blockNumber?: number) {
@@ -23,14 +25,14 @@ function cacheKey(payload: TransactionPayload, blockNumber?: number) {
 
 function buildSimulationSummary(source: "rpc" | "heuristic") {
   return {
-    mode: source === "rpc" ? "rpc-estimate" : "heuristic",
+    mode: source === "rpc" ? ("rpc-estimate" as const) : ("heuristic" as const),
     supportsNestedCalls: false,
     limitations: [
       "Preflight is advisory and does not execute a full EVM state transition.",
       "Nested multicall and flash-loan semantics still require a dedicated simulator.",
       "State can change between analysis and signing."
     ]
-  } as const;
+  };
 }
 
 export async function analyzeTransaction(
@@ -64,16 +66,35 @@ export async function analyzeTransaction(
 
   const decoded = decodeTransaction(payload);
   const simulation = await simulateTransaction(payload, decoded);
+
+  // Real threat intelligence from GoPlus API
+  let threatIntelFindings: RiskFinding[] = [];
+  let threatIntelScore = 0;
+  try {
+    const threatIntel = await getAddressThreatIntel(payload.to, payload.chainId);
+    threatIntelScore = threatIntel.riskScore;
+    threatIntelFindings = threatIntel.findings.map((finding, i) => ({
+      id: `goplus-${i}`,
+      title: finding.replace("GoPlus: ", ""),
+      description: `Real-time threat intelligence from GoPlus Security API (${threatIntel.source}).`,
+      severity: threatIntel.riskScore >= 0.8 ? "critical" as const : threatIntel.riskScore >= 0.5 ? "high" as const : "medium" as const,
+      action: threatIntel.riskScore >= 0.8 ? "Block signing immediately." : "Review with caution."
+    }));
+  } catch {
+    // GoPlus unavailable — continue with heuristic intelligence only
+  }
+
   const risk = evaluateRisk(payload, decoded, simulation.effects, {
     chainReverted: chainContext.callOutcome === "revert",
     newDestination: reputation.userNovelty === "new",
     repeatedSimilarTransactions: reputation.recentSimilarTransactions
   });
-  const combinedFindings = [...risk.findings, ...reputationFindings(reputation)];
+  const combinedFindings = [...risk.findings, ...reputationFindings(reputation), ...threatIntelFindings];
   const recalculatedScore = Math.min(
     1,
     Math.max(
       risk.score,
+      threatIntelScore,
       reputation.destinationLabel === "deny" ? 0.95 : reputation.userNovelty === "new" ? 0.55 : 0.1,
       reputation.domainRisk === "suspicious" ? 0.82 : 0.1,
       chainContext.callOutcome === "revert" ? 0.65 : 0.1
@@ -105,6 +126,22 @@ export async function analyzeTransaction(
     severity
   });
 
+  let zkContext: AnalysisResult["zkContext"];
+  if (payload.identityCommitment && (severity === "low" || severity === "medium" || severity === "high")) {
+    try {
+      const commitmentBigInt = BigInt(payload.identityCommitment);
+      const leafIndex = await insertLeaf(commitmentBigInt);
+      const merkle = await getMerklePath(leafIndex);
+      zkContext = {
+        merkleRoot: String(merkle.root),
+        merklePath: merkle.path.map(String),
+        merkleIndices: merkle.indices
+      };
+    } catch (e) {
+      console.error("Failed to insert into ZK Merkle tree", e);
+    }
+  }
+
   const unsignedResult: Omit<AnalysisResult, "resultIntegrity"> = {
     summary: explanation.summary,
     verdict,
@@ -130,6 +167,7 @@ export async function analyzeTransaction(
     chainContext,
     reputation,
     attestation,
+    zkContext,
     signingPolicy,
     telemetry: {
       usedOpenAI: explanation.usedOpenAI,

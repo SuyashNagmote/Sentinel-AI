@@ -23,6 +23,7 @@ export type TransactionPayload = {
     url?: string;
     intent?: UserIntent;
   };
+  identityCommitment?: string;
 };
 
 export type DecodedAction =
@@ -146,6 +147,11 @@ export type AnalysisResult = {
     accepted: boolean;
     record: ComplianceAttestation;
   };
+  zkContext?: {
+    merkleRoot: string;
+    merklePath: string[];
+    merkleIndices: number[];
+  };
   signingPolicy: {
     allowed: boolean;
     mode: "allow" | "warn" | "block";
@@ -154,8 +160,8 @@ export type AnalysisResult = {
   };
   resultIntegrity: {
     signature: string;
-    algorithm: "hmac-sha256";
-    verifier: "backend-shared-secret";
+    algorithm: "hmac-sha256" | "ml-dsa-65";
+    verifier: "backend-shared-secret" | "sentinel-node-pqc";
     publicDigest: string;
     verificationId: string;
   };

@@ -4,5 +4,18 @@ node_modules
 .env.local
 dist
 coverage
-prisma/dev.db
-prisma/dev.db-journal
+
+# Database
+sentinel.db
+sentinel.db-wal
+sentinel.db-shm
+
+# ZK build artifacts
+*.ptau
+*.r1cs
+*.sym
+*.zkey
+*.wasm
+circom.exe
+verification_key.json
+vote_js/

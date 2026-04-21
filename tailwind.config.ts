@@ -10,37 +10,43 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["var(--font-sans)"]
+        sans: ["var(--font-sans)"],
+        mono: ["var(--font-mono)"]
       },
       colors: {
-        background: "#06131d",
-        foreground: "#edf6fb",
-        border: "rgba(255,255,255,0.12)",
-        card: "rgba(8, 24, 37, 0.72)",
+        background: "#010308",
+        foreground: "#f8fafc",
+        border: "rgba(255,255,255,0.06)",
+        card: "rgba(3, 8, 14, 0.7)",
         primary: {
-          DEFAULT: "#59f3c2",
-          foreground: "#062119"
+          DEFAULT: "#00f0ff",
+          foreground: "#001a22"
+        },
+        success: {
+          DEFAULT: "#00ff9d",
+          foreground: "#002b1a"
         },
         danger: {
-          DEFAULT: "#ff5f6d",
-          foreground: "#fff4f4"
+          DEFAULT: "#ff2a5f",
+          foreground: "#3a000d"
         },
         warning: {
-          DEFAULT: "#ffbe5c",
-          foreground: "#2f1900"
+          DEFAULT: "#ffb300",
+          foreground: "#332200"
         },
         muted: {
-          DEFAULT: "rgba(227,239,247,0.18)",
-          foreground: "rgba(227,239,247,0.7)"
+          DEFAULT: "rgba(227,239,247,0.08)",
+          foreground: "rgba(227,239,247,0.5)"
         }
       },
       boxShadow: {
-        glow: "0 0 60px rgba(89, 243, 194, 0.18)",
-        danger: "0 0 40px rgba(255, 95, 109, 0.22)"
+        glow: "0 0 60px rgba(0, 240, 255, 0.25)",
+        danger: "0 0 60px rgba(255, 42, 95, 0.3)",
+        glass: "inset 0 1px 0 0 rgba(255, 255, 255, 0.08), 0 20px 40px -10px rgba(0, 0, 0, 0.8)"
       },
       backgroundImage: {
         grid:
-          "linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)"
+          "linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)"
       }
     }
   },

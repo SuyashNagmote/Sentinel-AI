@@ -9,6 +9,7 @@ export const transactionPayloadSchema = z.object({
   tokenSymbol: z.string().optional(),
   tokenDecimals: z.number().int().nonnegative().optional(),
   trusted: z.boolean().optional(),
+  identityCommitment: z.string().optional(),
   metadata: z
     .object({
       source: z.string().optional(),
