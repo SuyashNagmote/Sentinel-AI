@@ -3,6 +3,7 @@ import { createHash } from "crypto";
 import { decodeTransaction } from "@/src/modules/blockchain/decoder";
 import { getChainContext } from "@/src/modules/blockchain/provider";
 import { explainTransaction } from "@/src/modules/ai/explainer";
+import { inferUserIntent } from "@/src/modules/ai/intent-inference";
 import { readCache, writeCache } from "@/src/modules/cache/redis";
 import { getFeedbackCount, recordAnalysis } from "@/src/modules/database/repository";
 import { logEvent, logError, logDebug } from "@/src/modules/observability/logger";
@@ -80,6 +81,20 @@ export async function analyzeTransaction(
   }
 
   const decoded = decodeTransaction(payload);
+  const intentInference = await inferUserIntent(payload, decoded);
+  const shouldApplyInferredIntent =
+    (!payload.metadata?.intent || payload.metadata.intent === "other") &&
+    !!intentInference.intent &&
+    intentInference.confidence >= 0.65;
+  const effectivePayload = shouldApplyInferredIntent
+    ? {
+        ...payload,
+        metadata: {
+          ...payload.metadata,
+          intent: intentInference.intent,
+        },
+      }
+    : payload;
   const simulation = await simulateTransaction(payload, decoded);
 
   // Real threat intelligence from GoPlus API
@@ -104,7 +119,7 @@ export async function analyzeTransaction(
     logError("pipeline.goplus_failed", e, { address: payload.to });
   }
 
-  const risk = evaluateRisk(payload, decoded, simulation.effects, {
+  const risk = evaluateRisk(effectivePayload, decoded, simulation.effects, {
     chainReverted: chainContext.callOutcome === "revert",
     newDestination: reputation.userNovelty === "new",
     repeatedSimilarTransactions: reputation.recentSimilarTransactions,
@@ -175,8 +190,17 @@ export async function analyzeTransaction(
       ...risk.reasons,
       chainContext.callOutcome === "revert" ? "RPC preflight indicates possible execution failure." : "",
       reputation.domainRisk === "suspicious" ? "The supplied dapp origin appears suspicious." : "",
+      shouldApplyInferredIntent ? intentInference.explanation : "",
     ].filter(Boolean),
-    intent: risk.intent,
+    intent: {
+      ...risk.intent,
+      declared: effectivePayload.metadata?.intent,
+      source: shouldApplyInferredIntent ? "google-ai" : effectivePayload.metadata?.intent ? "user" : "none",
+      confidence: shouldApplyInferredIntent ? intentInference.confidence : undefined,
+      explanation: shouldApplyInferredIntent
+        ? `${intentInference.explanation} ${risk.intent.explanation}`
+        : risk.intent.explanation,
+    },
     simulation: buildSimulationSummary(simulation.simulationSource),
     intelligence: {
       sourceCount: 4,
@@ -190,7 +214,7 @@ export async function analyzeTransaction(
     zkContext,
     signingPolicy,
     telemetry: {
-      usedGoogleAI: explanation.usedGoogleAI,
+      usedGoogleAI: explanation.usedGoogleAI || intentInference.usedGoogleAI,
       liveRpc: chainContext.source === "rpc",
       cached: false,
       feedbackCount: await getFeedbackCount(),

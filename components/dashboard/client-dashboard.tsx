@@ -86,6 +86,20 @@ function toneForSeverity(severity?: AnalysisResult["severity"]) {
   };
 }
 
+function formatIntentLabel(value?: string) {
+  if (!value) return "Unavailable";
+  return value
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function formatIntentSource(source?: AnalysisResult["intent"]["source"]) {
+  if (source === "google-ai") return "Google AI";
+  if (source === "user") return "User Input";
+  return "Unavailable";
+}
+
 export function ClientDashboard() {
   const [selectedDemo, setSelectedDemo] = useState<string>(demoTransactions[1].id);
   const [input, setInput] = useState(initialJson);
@@ -118,6 +132,8 @@ export function ClientDashboard() {
   }, [input]);
   const tone = toneForSeverity(analysis?.severity);
   const VerdictIcon = tone.icon;
+  const actualAction = analysis?.decoded.kind ?? "Pending";
+  const hasIntentMismatch = analysis ? !analysis.intent.matches : false;
 
   useEffect(() => {
     const storedToken = window.localStorage.getItem("sentinelAuthToken");
@@ -489,6 +505,84 @@ export function ClientDashboard() {
                 </div>
               </div>
 
+              <div
+                className={cn(
+                  "rounded-[28px] border p-5",
+                  hasIntentMismatch ? "border-danger/35 bg-danger/10" : "border-white/10 bg-white/[0.05]"
+                )}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-xs uppercase tracking-[0.24em] text-white/45">Intent intelligence</div>
+                    <div className="mt-2 text-lg font-semibold text-white">
+                      {hasIntentMismatch ? "Mismatch detected" : "Intent and action are aligned"}
+                    </div>
+                  </div>
+                  <Badge
+                    className={cn(
+                      "border-white/10",
+                      hasIntentMismatch
+                        ? "bg-danger/15 text-danger"
+                        : "bg-emerald-500/10 text-emerald-300"
+                    )}
+                  >
+                    {analysis ? (hasIntentMismatch ? "YES -> BLOCK" : "NO -> REVIEW/ALLOW") : "Waiting"}
+                  </Badge>
+                </div>
+
+                <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                  <div className="rounded-[22px] border border-white/10 bg-black/20 p-4">
+                    <div className="text-[11px] uppercase tracking-[0.22em] text-white/45">Intent source</div>
+                    <div className="mt-2 text-base font-semibold text-white">
+                      {analysis ? formatIntentSource(analysis.intent.source) : "Unavailable"}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[22px] border border-white/10 bg-black/20 p-4">
+                    <div className="text-[11px] uppercase tracking-[0.22em] text-white/45">Inferred intent</div>
+                    <div className="mt-2 text-base font-semibold text-white">
+                      {analysis ? formatIntentLabel(analysis.intent.declared) : "Unavailable"}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[22px] border border-white/10 bg-black/20 p-4">
+                    <div className="text-[11px] uppercase tracking-[0.22em] text-white/45">Confidence</div>
+                    <div className="mt-2 text-base font-semibold text-white">
+                      {analysis && typeof analysis.intent.confidence === "number"
+                        ? analysis.intent.confidence.toFixed(2)
+                        : analysis?.intent.source === "user"
+                          ? "User-set"
+                          : "Unavailable"}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[22px] border border-white/10 bg-black/20 p-4">
+                    <div className="text-[11px] uppercase tracking-[0.22em] text-white/45">Actual action</div>
+                    <div className="mt-2 text-base font-semibold text-white">
+                      {analysis ? formatIntentLabel(actualAction) : "Pending"}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[22px] border border-white/10 bg-black/20 p-4">
+                    <div className="text-[11px] uppercase tracking-[0.22em] text-white/45">Mismatch</div>
+                    <div
+                      className={cn(
+                        "mt-2 text-base font-semibold",
+                        hasIntentMismatch ? "text-danger" : "text-emerald-300",
+                        !analysis && "text-white"
+                      )}
+                    >
+                      {analysis ? (hasIntentMismatch ? "YES -> BLOCK" : "NO") : "Pending"}
+                    </div>
+                  </div>
+                </div>
+
+                <p className="mt-4 text-sm leading-6 text-white/70">
+                  {analysis?.intent.explanation ??
+                    "Sentinel can use Google AI to infer likely user intent from dApp context, then compare it against the decoded transaction action."}
+                </p>
+              </div>
+
               <div className="rounded-[28px] border border-white/8 bg-white/[0.05] p-4">
                 <div className="text-xs uppercase tracking-[0.24em] text-white/45">Human-readable explanation</div>
                 <p className="mt-3 text-sm leading-7 text-white/80">
@@ -561,7 +655,7 @@ export function ClientDashboard() {
                 </div>
                 <p className="mt-3 text-sm leading-6 text-white/70">
                   {analysis
-                    ? `Declared intent: ${analysis.intent.declared ?? "none"}. Inferred action: ${analysis.intent.inferred}. ${analysis.intent.explanation}`
+                    ? `Intent source: ${formatIntentSource(analysis.intent.source)}. Inferred intent: ${formatIntentLabel(analysis.intent.declared)}. Actual action: ${formatIntentLabel(analysis.intent.inferred)}. ${analysis.intent.explanation}`
                     : "Declare what the user is trying to do, then Sentinel will compare that with the decoded action."}
                 </p>
               </div>

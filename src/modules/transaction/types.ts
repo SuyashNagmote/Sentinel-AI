@@ -131,6 +131,8 @@ export type AnalysisResult = {
     inferred: string;
     matches: boolean;
     explanation: string;
+    source?: "user" | "google-ai" | "none";
+    confidence?: number;
   };
   simulation: {
     mode: "heuristic" | "rpc-estimate" | "rpc-trace" | "tenderly";
