@@ -190,7 +190,7 @@ export async function analyzeTransaction(
     zkContext,
     signingPolicy,
     telemetry: {
-      usedOpenAI: explanation.usedOpenAI,
+      usedGoogleAI: explanation.usedGoogleAI,
       liveRpc: chainContext.source === "rpc",
       cached: false,
       feedbackCount: await getFeedbackCount(),

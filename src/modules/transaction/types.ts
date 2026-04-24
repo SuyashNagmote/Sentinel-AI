@@ -168,7 +168,7 @@ export type AnalysisResult = {
     verificationId: string;
   };
   telemetry: {
-    usedOpenAI: boolean;
+    usedGoogleAI: boolean;
     liveRpc: boolean;
     cached: boolean;
     feedbackCount: number;
