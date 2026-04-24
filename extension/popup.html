@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sentinel AI</title>
+  <style>
+    body {
+      width: 320px;
+      margin: 0;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #09090b;
+      color: #fafafa;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .header img {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      background: rgba(34, 197, 94, 0.2);
+      color: #4ade80;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    label {
+      display: block;
+      font-size: 12px;
+      color: #a1a1aa;
+      margin-bottom: 8px;
+    }
+    input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 12px;
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 8px;
+      color: white;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus {
+      border-color: #3b82f6;
+    }
+    button {
+      width: 100%;
+      padding: 10px;
+      background: white;
+      color: black;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #f4f4f5;
+    }
+    .footer {
+      margin-top: 16px;
+      text-align: center;
+      font-size: 11px;
+      color: #71717a;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="32" height="32" rx="8" fill="#18181b"/>
+      <path d="M16 6L6 10.4444V16.6667C6 22.3889 10.2857 27.6667 16 30C21.7143 27.6667 26 22.3889 26 16.6667V10.4444L16 6Z" stroke="#3b82f6" stroke-width="2" stroke-linejoin="round"/>
+    </svg>
+    <div>
+      <h1>Sentinel AI</h1>
+      <div class="status-badge">Active</div>
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label for="apiUrl">API Endpoint</label>
+    <input type="text" id="apiUrl" placeholder="http://localhost:3000/api/analyze" />
+  </div>
+
+  <button id="saveBtn">Save Settings</button>
+
+  <div class="footer">
+    Web3 Security Operations Center
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

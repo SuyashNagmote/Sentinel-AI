@@ -33,6 +33,7 @@ export async function ensureMigrated(): Promise<void> {
       chain_id INTEGER,
       from_address TEXT NOT NULL,
       to_address TEXT NOT NULL,
+      call_selector TEXT,
       severity TEXT NOT NULL,
       verdict TEXT NOT NULL,
       score REAL NOT NULL,
@@ -45,6 +46,7 @@ export async function ensureMigrated(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_analyses_severity ON analyses(severity);
     CREATE INDEX IF NOT EXISTS idx_analyses_actor ON analyses(actor_address);
     CREATE INDEX IF NOT EXISTS idx_analyses_created ON analyses(created_at);
+    CREATE INDEX IF NOT EXISTS idx_analyses_selector ON analyses(call_selector);
 
     CREATE TABLE IF NOT EXISTS attestations (
       id SERIAL PRIMARY KEY,
@@ -84,6 +86,10 @@ export async function ensureMigrated(): Promise<void> {
       value TEXT NOT NULL,
       expires_at BIGINT NOT NULL
     );
+
+    ALTER TABLE analyses ADD COLUMN IF NOT EXISTS call_selector TEXT;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_attestations_nullifier_unique
+      ON attestations(nullifier);
   `);
   _migrated = true;
 }
@@ -91,37 +97,48 @@ export async function ensureMigrated(): Promise<void> {
 // ─── Analysis CRUD ───
 
 export async function insertAnalysis(
-  cacheKey: string,
-  payload: { chainId: number; from: string; to: string },
+  cacheKey: string | null,
+  payload: { chainId: number; from: string; to: string; selector?: string },
   result: { severity: string; verdict: string; score: number; decoded?: { kind?: string } },
   resultJson: string,
   actorAddress?: string
 ): Promise<number> {
   await ensureMigrated();
   const pool = getPool();
-  const res = await pool.query(
-    `INSERT INTO analyses (cache_key, actor_address, chain_id, from_address, to_address, severity, verdict, score, decoded_kind, payload_json, result_json)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-     ON CONFLICT (cache_key) DO UPDATE SET
-       result_json = EXCLUDED.result_json,
-       severity = EXCLUDED.severity,
-       verdict = EXCLUDED.verdict,
-       score = EXCLUDED.score
-     RETURNING id`,
-    [
-      cacheKey,
-      actorAddress ?? null,
-      payload.chainId,
-      payload.from,
-      payload.to,
-      result.severity,
-      result.verdict,
-      result.score,
-      result.decoded?.kind ?? null,
-      JSON.stringify(payload),
-      resultJson,
-    ]
-  );
+  const params = [
+    cacheKey,
+    actorAddress ?? null,
+    payload.chainId,
+    payload.from.toLowerCase(),
+    payload.to.toLowerCase(),
+    payload.selector ?? null,
+    result.severity,
+    result.verdict,
+    result.score,
+    result.decoded?.kind ?? null,
+    JSON.stringify(payload),
+    resultJson,
+  ];
+  const res = cacheKey
+    ? await pool.query(
+        `INSERT INTO analyses (cache_key, actor_address, chain_id, from_address, to_address, call_selector, severity, verdict, score, decoded_kind, payload_json, result_json)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         ON CONFLICT (cache_key) DO UPDATE SET
+           result_json = EXCLUDED.result_json,
+           severity = EXCLUDED.severity,
+           verdict = EXCLUDED.verdict,
+           score = EXCLUDED.score,
+           decoded_kind = EXCLUDED.decoded_kind,
+           call_selector = EXCLUDED.call_selector
+         RETURNING id`,
+        params
+      )
+    : await pool.query(
+        `INSERT INTO analyses (cache_key, actor_address, chain_id, from_address, to_address, call_selector, severity, verdict, score, decoded_kind, payload_json, result_json)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         RETURNING id`,
+        params
+      );
   return res.rows[0].id;
 }
 
@@ -175,6 +192,26 @@ export async function insertAttestation(
      ON CONFLICT (attestation_id) DO NOTHING`,
     [attestationId, nullifier, severity, fromAddress, toAddress, chainId ?? null]
   );
+}
+
+export async function consumeAttestationNullifier(
+  attestationId: string,
+  nullifier: string,
+  severity: string,
+  fromAddress: string,
+  toAddress: string,
+  chainId?: number
+): Promise<boolean> {
+  await ensureMigrated();
+  const pool = getPool();
+  const res = await pool.query(
+    `INSERT INTO attestations (attestation_id, nullifier, severity, from_address, to_address, chain_id)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     ON CONFLICT (nullifier) DO NOTHING
+     RETURNING id`,
+    [attestationId, nullifier, severity, fromAddress.toLowerCase(), toAddress.toLowerCase(), chainId ?? null]
+  );
+  return (res.rowCount ?? 0) > 0;
 }
 
 // ─── Feedback CRUD ───
@@ -284,4 +321,42 @@ export async function writeCachePg(key: string, value: string, ttlSeconds = 300)
     "INSERT INTO cache (key, value, expires_at) VALUES ($1, $2, $3) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, expires_at = EXCLUDED.expires_at",
     [key, value, expiresAt]
   );
+}
+
+// ─── Analytics ───
+
+export async function getPlatformMetricsPg() {
+  await ensureMigrated();
+  const pool = getPool();
+  
+  const totalRes = await pool.query("SELECT COUNT(*) FROM analyses");
+  const threatsRes = await pool.query("SELECT COUNT(*) FROM analyses WHERE severity IN ('high', 'critical')");
+  
+  // Recent 10 analyses
+  const recentRes = await pool.query(`
+    SELECT id, severity, verdict, created_at, payload_json, result_json 
+    FROM analyses 
+    ORDER BY created_at DESC 
+    LIMIT 10
+  `);
+
+  return {
+    totalScanned: parseInt(totalRes.rows[0].count, 10),
+    threatsPrevented: parseInt(threatsRes.rows[0].count, 10),
+    recentAnalyses: recentRes.rows.map(r => ({
+      id: r.id,
+      severity: r.severity,
+      verdict: r.verdict,
+      timestamp: r.created_at,
+      decodedKind: JSON.parse(r.result_json)?.decoded?.kind ?? "contract-call",
+      summary: JSON.parse(r.result_json)?.summary ?? r.verdict,
+      source: maskAddress(JSON.parse(r.payload_json)?.from),
+      destination: maskAddress(JSON.parse(r.payload_json)?.to),
+    }))
+  };
+}
+
+function maskAddress(address?: string | null): string {
+  if (!address || typeof address !== "string") return "unknown";
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }

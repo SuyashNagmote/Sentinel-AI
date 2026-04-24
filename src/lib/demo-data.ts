@@ -2,7 +2,7 @@ import { Interface, MaxUint256, parseUnits } from "ethers";
 
 const erc20 = new Interface([
   "function approve(address spender, uint256 amount)",
-  "function transfer(address to, uint256 amount)"
+  "function transfer(address to, uint256 amount)",
 ]);
 
 export const demoTransactions = [
@@ -12,12 +12,12 @@ export const demoTransactions = [
     description: "A standard low-risk payment to a known recipient.",
     payload: {
       chainId: 1,
-      from: "0xA11ce00000000000000000000000000000001234",
-      to: "0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      from: "0xA11cE00000000000000000000000000000001234",
+      to: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
       value: "0",
       data: erc20.encodeFunctionData("transfer", [
         "0x1111111111111111111111111111111111111111",
-        parseUnits("125", 6)
+        parseUnits("125", 6),
       ]),
       tokenSymbol: "USDC",
       tokenDecimals: 6,
@@ -26,9 +26,9 @@ export const demoTransactions = [
         source: "Treasury payout",
         dappName: "Aegis Payroll",
         url: "https://payroll.aegis.local",
-        intent: "send"
-      }
-    }
+        intent: "send",
+      },
+    },
   },
   {
     id: "unlimited-approval",
@@ -36,12 +36,12 @@ export const demoTransactions = [
     description: "A common wallet-drain pattern disguised as a routine approval.",
     payload: {
       chainId: 1,
-      from: "0xA11ce00000000000000000000000000000001234",
-      to: "0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      from: "0xA11cE00000000000000000000000000000001234",
+      to: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
       value: "0",
       data: erc20.encodeFunctionData("approve", [
-        "0xdeaddeaddeaddeaddeaddeaddeaddeaddead0001",
-        MaxUint256
+        "0xDeaDDEaDDeAdDeAdDEAdDEaddeAddEAdDEAd0001",
+        MaxUint256,
       ]),
       tokenSymbol: "USDC",
       tokenDecimals: 6,
@@ -50,9 +50,9 @@ export const demoTransactions = [
         source: "Claim airdrop",
         dappName: "FreeYield Pro",
         url: "https://freeyield-security-check.example",
-        intent: "claim"
-      }
-    }
+        intent: "claim",
+      },
+    },
   },
   {
     id: "native-drain",
@@ -60,8 +60,8 @@ export const demoTransactions = [
     description: "A direct transfer that could empty the wallet if approved blindly.",
     payload: {
       chainId: 1,
-      from: "0xA11ce00000000000000000000000000000001234",
-      to: "0xFaCefAceFaCefAceFaCefAceFaCefAceFaCe0002",
+      from: "0xA11cE00000000000000000000000000000001234",
+      to: "0xfAceFACEfaceFACefacEFACefAcefAcefaCe0002",
       value: "4.25",
       data: "0x",
       trusted: false,
@@ -69,10 +69,10 @@ export const demoTransactions = [
         source: "Urgent verification request",
         dappName: "Wallet Verify",
         url: "https://wallet-verify-now.example",
-        intent: "other"
-      }
-    }
-  }
+        intent: "other",
+      },
+    },
+  },
 ] as const;
 
 export const defaultDemoTransaction = demoTransactions[1].payload;

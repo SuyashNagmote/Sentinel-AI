@@ -4,6 +4,8 @@
  */
 import Redis from "ioredis";
 
+import { logDebug, logError } from "@/src/modules/observability/logger";
+
 let client: Redis | null = null;
 const fallbackCache = new Map<string, { value: string; expiresAt: number }>();
 
@@ -11,7 +13,8 @@ async function getPgCache() {
   if (!process.env.DATABASE_URL) return null;
   try {
     return await import("../database/postgres");
-  } catch {
+  } catch (e) {
+    logError("cache.pg_import_failed", e);
     return null;
   }
 }
@@ -21,7 +24,7 @@ function getRedisClient() {
   if (!client) {
     client = new Redis(process.env.REDIS_URL, {
       lazyConnect: true,
-      maxRetriesPerRequest: 1
+      maxRetriesPerRequest: 1,
     });
   }
   return client;
@@ -34,8 +37,13 @@ export async function readCache(key: string): Promise<string | null> {
     try {
       if (redis.status === "wait") await redis.connect();
       const val = await redis.get(key);
-      if (val) return val;
-    } catch { /* fall through */ }
+      if (val) {
+        logDebug("cache.hit", { source: "redis", key: key.slice(0, 12) });
+        return val;
+      }
+    } catch (e) {
+      logError("cache.redis_read_failed", e, { key: key.slice(0, 12) });
+    }
   }
 
   // Try PostgreSQL
@@ -43,8 +51,13 @@ export async function readCache(key: string): Promise<string | null> {
   if (pgCache) {
     try {
       const val = await pgCache.readCachePg(key);
-      if (val) return val;
-    } catch { /* fall through */ }
+      if (val) {
+        logDebug("cache.hit", { source: "postgres", key: key.slice(0, 12) });
+        return val;
+      }
+    } catch (e) {
+      logError("cache.pg_read_failed", e, { key: key.slice(0, 12) });
+    }
   }
 
   // In-memory fallback
@@ -54,6 +67,7 @@ export async function readCache(key: string): Promise<string | null> {
       fallbackCache.delete(key);
       return null;
     }
+    logDebug("cache.hit", { source: "memory", key: key.slice(0, 12) });
     return mem.value;
   }
 
@@ -71,7 +85,9 @@ export async function writeCache(key: string, value: string, ttlSeconds = 300) {
   if (pgCache) {
     try {
       await pgCache.writeCachePg(key, value, ttlSeconds);
-    } catch { /* ignore */ }
+    } catch (e) {
+      logError("cache.pg_write_failed", e, { key: key.slice(0, 12) });
+    }
   }
 
   // Write to Redis if available
@@ -80,6 +96,8 @@ export async function writeCache(key: string, value: string, ttlSeconds = 300) {
     try {
       if (redis.status === "wait") await redis.connect();
       await redis.set(key, value, "EX", ttlSeconds);
-    } catch { /* ignore */ }
+    } catch (e) {
+      logError("cache.redis_write_failed", e, { key: key.slice(0, 12) });
+    }
   }
 }

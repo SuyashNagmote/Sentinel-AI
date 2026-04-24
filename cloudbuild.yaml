@@ -1,0 +1,30 @@
+steps:
+  # Step 1: Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/sentinel-ai:$COMMIT_SHA', '.']
+
+  # Step 2: Push the Docker image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/sentinel-ai:$COMMIT_SHA']
+
+  # Step 3: Deploy the image to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'sentinel-ai'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/sentinel-ai:$COMMIT_SHA'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--port'
+      - '8080'
+      # You can add environment variables mapping from Secret Manager here
+      # - '--set-secrets=DATABASE_URL=DATABASE_URL:latest,AUTH_SECRET=AUTH_SECRET:latest'
+
+images:
+  - 'gcr.io/$PROJECT_ID/sentinel-ai:$COMMIT_SHA'

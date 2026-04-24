@@ -8,7 +8,7 @@ import { enforceRateLimit } from "@/src/modules/security/rate-limit";
 export async function POST(request: Request) {
   try {
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
-    const rate = enforceRateLimit(`analyze:${ip}`, 120, 60_000);
+    const rate = await enforceRateLimit(`analyze:${ip}`, 120, 60_000);
     if (!rate.allowed) {
       return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
     }
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error: "Invalid transaction payload",
-          issues: error.issues
+          issues: error.issues,
         },
         { status: 400 }
       );
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : "Unexpected analysis error"
+        error: error instanceof Error ? error.message : "Unexpected analysis error",
       },
       { status: 500 }
     );

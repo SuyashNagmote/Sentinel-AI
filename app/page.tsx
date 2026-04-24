@@ -261,7 +261,7 @@ export default function HomePage() {
           </Reveal>
 
           <StaggerContainer className="grid md:grid-cols-2 gap-4" stagger={0.1}>
-            {pillars.map((pillar, _i) => (
+            {pillars.map((pillar) => (
               <StaggerItem key={pillar.title}>
                 <GlowCard>
                   <div className={`absolute inset-0 bg-gradient-to-br ${pillar.gradient}`} />
@@ -317,7 +317,7 @@ export default function HomePage() {
                 title: "Attest",
                 text: "The verdict is sealed with ML-DSA-65 Post-Quantum signatures and anchored with Poseidon nullifiers for replay protection.",
               },
-            ].map((item, _i) => (
+            ].map((item) => (
               <StaggerItem key={item.step}>
                 <GlowCard className="h-full">
                   <div className="p-7 h-full flex flex-col">

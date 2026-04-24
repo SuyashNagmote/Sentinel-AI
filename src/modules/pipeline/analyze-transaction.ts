@@ -5,7 +5,7 @@ import { getChainContext } from "@/src/modules/blockchain/provider";
 import { explainTransaction } from "@/src/modules/ai/explainer";
 import { readCache, writeCache } from "@/src/modules/cache/redis";
 import { getFeedbackCount, recordAnalysis } from "@/src/modules/database/repository";
-import { logEvent } from "@/src/modules/observability/logger";
+import { logEvent, logError, logDebug } from "@/src/modules/observability/logger";
 import { getReputationContext, reputationFindings } from "@/src/modules/reputation/service";
 import { evaluateRisk } from "@/src/modules/risk/engine";
 import { signAnalysisResult } from "@/src/modules/security/integrity";
@@ -23,15 +23,29 @@ function cacheKey(payload: TransactionPayload, blockNumber?: number) {
     .digest("hex");
 }
 
-function buildSimulationSummary(source: "rpc" | "heuristic") {
+function buildSimulationSummary(source: "tenderly" | "rpc-trace" | "heuristic") {
+  const limitations =
+    source === "tenderly"
+      ? [
+          "Tenderly simulation provides high-fidelity EVM trace but does not guarantee on-chain outcome.",
+          "State can change between simulation and actual signing.",
+        ]
+      : source === "rpc-trace"
+        ? [
+            "RPC trace provides internal call and transfer visibility but may miss complex DeFi interactions.",
+            "Not all RPC providers support debug_traceCall.",
+            "State can change between analysis and signing.",
+          ]
+        : [
+            "Preflight is advisory and does not execute a full EVM state transition.",
+            "Nested multicall and flash-loan semantics still require a dedicated simulator.",
+            "State can change between analysis and signing.",
+          ];
+
   return {
-    mode: source === "rpc" ? ("rpc-estimate" as const) : ("heuristic" as const),
-    supportsNestedCalls: false,
-    limitations: [
-      "Preflight is advisory and does not execute a full EVM state transition.",
-      "Nested multicall and flash-loan semantics still require a dedicated simulator.",
-      "State can change between analysis and signing."
-    ]
+    mode: source as "heuristic" | "rpc-estimate" | "rpc-trace" | "tenderly",
+    supportsNestedCalls: source === "tenderly",
+    limitations,
   };
 }
 
@@ -41,11 +55,12 @@ export async function analyzeTransaction(
 ): Promise<AnalysisResult> {
   const payload = transactionPayloadSchema.parse(rawPayload);
   const chainContext = await getChainContext(payload);
-  const reputation = getReputationContext(payload);
+  const reputation = await getReputationContext(payload);
   const key = cacheKey(payload, chainContext.blockNumber);
   const cached = await readCache(key);
 
   if (cached) {
+    logDebug("pipeline.cache_hit", { key: key.slice(0, 12) });
     const parsed = JSON.parse(cached) as AnalysisResult;
     const attestation = await recordComplianceAttestation(payload, parsed.severity);
     const signingPolicy = buildSigningPreview(payload, parsed.severity);
@@ -59,8 +74,8 @@ export async function analyzeTransaction(
         liveRpc: chainContext.source === "rpc",
         feedbackCount: await getFeedbackCount(),
         authMode: "wallet-signature",
-        rateLimitMode: "memory"
-      }
+        rateLimitMode: "memory",
+      },
     } as AnalysisResult;
   }
 
@@ -77,17 +92,22 @@ export async function analyzeTransaction(
       id: `goplus-${i}`,
       title: finding.replace("GoPlus: ", ""),
       description: `Real-time threat intelligence from GoPlus Security API (${threatIntel.source}).`,
-      severity: threatIntel.riskScore >= 0.8 ? "critical" as const : threatIntel.riskScore >= 0.5 ? "high" as const : "medium" as const,
-      action: threatIntel.riskScore >= 0.8 ? "Block signing immediately." : "Review with caution."
+      severity:
+        threatIntel.riskScore >= 0.8
+          ? ("critical" as const)
+          : threatIntel.riskScore >= 0.5
+            ? ("high" as const)
+            : ("medium" as const),
+      action: threatIntel.riskScore >= 0.8 ? "Block signing immediately." : "Review with caution.",
     }));
-  } catch {
-    // GoPlus unavailable — continue with heuristic intelligence only
+  } catch (e) {
+    logError("pipeline.goplus_failed", e, { address: payload.to });
   }
 
   const risk = evaluateRisk(payload, decoded, simulation.effects, {
     chainReverted: chainContext.callOutcome === "revert",
     newDestination: reputation.userNovelty === "new",
-    repeatedSimilarTransactions: reputation.recentSimilarTransactions
+    repeatedSimilarTransactions: reputation.recentSimilarTransactions,
   });
   const combinedFindings = [...risk.findings, ...reputationFindings(reputation), ...threatIntelFindings];
   const recalculatedScore = Math.min(
@@ -123,7 +143,7 @@ export async function analyzeTransaction(
     decoded,
     effects: simulation.effects,
     findings: combinedFindings,
-    severity
+    severity,
   });
 
   let zkContext: AnalysisResult["zkContext"];
@@ -135,10 +155,10 @@ export async function analyzeTransaction(
       zkContext = {
         merkleRoot: String(merkle.root),
         merklePath: merkle.path.map(String),
-        merkleIndices: merkle.indices
+        merkleIndices: merkle.indices,
       };
     } catch (e) {
-      console.error("Failed to insert into ZK Merkle tree", e);
+      logError("pipeline.zk_merkle_failed", e);
     }
   }
 
@@ -154,15 +174,15 @@ export async function analyzeTransaction(
     reasons: [
       ...risk.reasons,
       chainContext.callOutcome === "revert" ? "RPC preflight indicates possible execution failure." : "",
-      reputation.domainRisk === "suspicious" ? "The supplied dapp origin appears suspicious." : ""
+      reputation.domainRisk === "suspicious" ? "The supplied dapp origin appears suspicious." : "",
     ].filter(Boolean),
     intent: risk.intent,
-    simulation: buildSimulationSummary(chainContext.source),
+    simulation: buildSimulationSummary(simulation.simulationSource),
     intelligence: {
       sourceCount: 4,
       matchedSignals: combinedFindings.map((finding) => finding.id),
       hasBlocklistMatch: reputation.destinationLabel === "deny",
-      hasDomainRisk: reputation.domainRisk === "suspicious"
+      hasDomainRisk: reputation.domainRisk === "suspicious",
     },
     chainContext,
     reputation,
@@ -175,13 +195,13 @@ export async function analyzeTransaction(
       cached: false,
       feedbackCount: await getFeedbackCount(),
       authMode: "wallet-signature",
-      rateLimitMode: "memory"
-    }
+      rateLimitMode: "memory",
+    },
   };
 
   const result: AnalysisResult = {
     ...unsignedResult,
-    resultIntegrity: signAnalysisResult(unsignedResult)
+    resultIntegrity: signAnalysisResult(unsignedResult),
   };
 
   await writeCache(key, JSON.stringify(result));
@@ -190,7 +210,8 @@ export async function analyzeTransaction(
     actorAddress: actorAddress ?? "anonymous",
     severity: result.severity,
     verdict: result.verdict,
-    cached: false
+    simulationSource: simulation.simulationSource,
+    cached: false,
   });
 
   return result;

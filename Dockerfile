@@ -35,11 +35,11 @@ COPY --from=builder /app/.next/static ./.next/static
 
 USER sentinel
 
-EXPOSE 3000
+EXPOSE 8080
 ENV HOSTNAME="0.0.0.0"
 
-# Railway injects PORT dynamically; fallback to 3000 for local Docker runs
-ENV PORT=3000
+# Cloud Run injects PORT dynamically; fallback to 8080
+ENV PORT=8080
 
 # Use dumb-init to handle PID 1 properly
 ENTRYPOINT ["dumb-init", "--"]

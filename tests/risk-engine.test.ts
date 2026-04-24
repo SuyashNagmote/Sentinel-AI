@@ -4,8 +4,8 @@ import type { DecodedAction, SimulationEffect, TransactionPayload } from "../src
 
 const basePayload: TransactionPayload = {
   chainId: 1,
-  from: "0xabc0000000000000000000000000000000000001",
-  to: "0xdef0000000000000000000000000000000000002",
+  from: "0xAbC0000000000000000000000000000000000001",
+  to: "0xDef0000000000000000000000000000000000002",
   value: "0",
   data: "0x095ea7b3",
   trusted: false,
@@ -14,7 +14,7 @@ const basePayload: TransactionPayload = {
 
 const unlimitedApproval: DecodedAction = {
   kind: "approve",
-  spender: "0xspender",
+  spender: "0xSpender0000000000000000000000000000000001",
   amount: "unlimited",
   isUnlimited: true,
   tokenSymbol: "USDC",
@@ -22,13 +22,13 @@ const unlimitedApproval: DecodedAction = {
 
 const normalTransfer: DecodedAction = {
   kind: "transfer",
-  recipient: "0xrecipient",
+  recipient: "0xRecipient00000000000000000000000000000001",
   amount: "100",
   tokenSymbol: "USDC",
 };
 
 const baseEffects: SimulationEffect[] = [
-  { label: "Approval", from: "0xa", to: "0xb", asset: "USDC", amount: "unlimited", direction: "approval" },
+  { label: "Approval", from: "0xAbC0000000000000000000000000000000000001", to: "0xDef0000000000000000000000000000000000002", asset: "USDC", amount: "unlimited", direction: "approval" },
 ];
 
 describe("evaluateRisk", () => {
@@ -52,7 +52,7 @@ describe("evaluateRisk", () => {
   it("passes intent match when declared matches decoded (send → transfer)", () => {
     const payload = { ...basePayload, trusted: true, metadata: { intent: "send" as const, source: "test", dappName: "Test" } };
     const effects: SimulationEffect[] = [
-      { label: "Transfer", from: "0xa", to: "0xb", asset: "USDC", amount: "100", direction: "out" },
+      { label: "Transfer", from: "0xAbC0000000000000000000000000000000000001", to: "0xDef0000000000000000000000000000000000002", asset: "USDC", amount: "100", direction: "out" },
     ];
     const result = evaluateRisk(payload, normalTransfer, effects);
     expect(result.intent.matches).toBe(true);
@@ -73,7 +73,7 @@ describe("evaluateRisk", () => {
   });
 
   it("flags suspicious contract from deny list", () => {
-    const payload = { ...basePayload, to: "0xdeaddeaddeaddeaddeaddeaddeaddeaddead0001" };
+    const payload = { ...basePayload, to: "0xdEaDDeaDDeaDDeaDDeaDDeaDDeaDDeaDdEAd0001" };
     const result = evaluateRisk(payload, normalTransfer, []);
     expect(result.findings.some((f) => f.id === "suspicious-contract")).toBe(true);
     expect(result.severity).toBe("critical");
@@ -88,5 +88,21 @@ describe("evaluateRisk", () => {
     const result = evaluateRisk(basePayload, unlimitedApproval, baseEffects);
     expect(result.confidence).toBeGreaterThan(0.5);
     expect(result.confidence).toBeLessThanOrEqual(0.98);
+  });
+
+  it("detects hidden approvals in multicall", () => {
+    const multicall: DecodedAction = {
+      kind: "multicall",
+      target: "0xDef0000000000000000000000000000000000002",
+      innerCalls: 2,
+      selector: "0xac9650d8",
+      innerActions: [
+        { kind: "approve", spender: "0xBad0000000000000000000000000000000000001", amount: "unlimited", isUnlimited: true, tokenSymbol: "USDC" },
+        { kind: "transfer", recipient: "0xOk00000000000000000000000000000000000001", amount: "100", tokenSymbol: "USDC" },
+      ],
+    };
+    const result = evaluateRisk(basePayload, multicall, []);
+    expect(result.findings.some((f) => f.id === "hidden-approval-in-multicall")).toBe(true);
+    expect(result.severity).toBe("critical");
   });
 });

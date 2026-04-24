@@ -47,6 +47,8 @@ export type DecodedAction =
       target: string;
       innerCalls: number;
       selector: string;
+      /** Recursively decoded inner actions when decoding succeeds */
+      innerActions?: DecodedAction[];
     }
   | {
       kind: "transfer";
@@ -131,7 +133,7 @@ export type AnalysisResult = {
     explanation: string;
   };
   simulation: {
-    mode: "heuristic" | "rpc-estimate";
+    mode: "heuristic" | "rpc-estimate" | "rpc-trace" | "tenderly";
     supportsNestedCalls: boolean;
     limitations: string[];
   };
@@ -160,8 +162,8 @@ export type AnalysisResult = {
   };
   resultIntegrity: {
     signature: string;
-    algorithm: "hmac-sha256" | "ml-dsa-65";
-    verifier: "backend-shared-secret" | "sentinel-node-pqc";
+    algorithm: "ml-dsa-65";
+    verifier: "sentinel-node-pqc";
     publicDigest: string;
     verificationId: string;
   };
@@ -171,6 +173,6 @@ export type AnalysisResult = {
     cached: boolean;
     feedbackCount: number;
     authMode: "wallet-signature";
-    rateLimitMode: "memory" | "redis";
+    rateLimitMode: "memory" | "redis" | "postgres";
   };
 };

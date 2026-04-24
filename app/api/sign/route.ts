@@ -15,7 +15,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
-    const rate = enforceRateLimit(`sign:${session.address}`, 40, 60_000);
+    const rate = await enforceRateLimit(`sign:${session.address}`, 40, 60_000);
     if (!rate.allowed) {
       return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
     }
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error: "Invalid transaction payload",
-          issues: error.issues
+          issues: error.issues,
         },
         { status: 400 }
       );
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : "Unexpected signing guard error"
+        error: error instanceof Error ? error.message : "Unexpected signing guard error",
       },
       { status: 500 }
     );

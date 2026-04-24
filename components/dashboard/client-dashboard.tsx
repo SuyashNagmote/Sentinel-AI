@@ -120,6 +120,20 @@ export function ClientDashboard() {
   const VerdictIcon = tone.icon;
 
   useEffect(() => {
+    const storedToken = window.localStorage.getItem("sentinelAuthToken");
+    const storedAddress = window.localStorage.getItem("sentinelWalletAddress");
+
+    if (storedToken) {
+      setToken(storedToken);
+    }
+
+    if (storedAddress) {
+      setWalletAddress(storedAddress);
+      setWalletStatus(`Connected as ${formatAddress(storedAddress)}`);
+    }
+  }, []);
+
+  useEffect(() => {
     const selected = demoTransactions.find((item) => item.id === selectedDemo);
     if (!selected) return;
     setAnalysis(null);
@@ -239,6 +253,8 @@ export function ClientDashboard() {
 
       setWalletAddress(address);
       setToken(verifyData.token);
+      window.localStorage.setItem("sentinelAuthToken", verifyData.token);
+      window.localStorage.setItem("sentinelWalletAddress", address);
       setWalletStatus(`Connected as ${formatAddress(address)}`);
       setInput(
         updatePayload(input, (payload) => ({

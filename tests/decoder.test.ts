@@ -4,8 +4,8 @@ import type { TransactionPayload } from "../src/modules/transaction/types";
 
 const basePayload: TransactionPayload = {
   chainId: 1,
-  from: "0xabc0000000000000000000000000000000000001",
-  to: "0xdef0000000000000000000000000000000000002",
+  from: "0xAbC0000000000000000000000000000000000001",
+  to: "0xDef0000000000000000000000000000000000002",
   value: "0",
   data: "0x",
   trusted: false,
@@ -52,5 +52,17 @@ describe("decodeTransaction", () => {
     const data = "0xdeadbeef0000000000000000000000000000000000000000000000000000000000000001";
     const result = decodeTransaction({ ...basePayload, data });
     expect(result.kind).toBe("contract-call");
+  });
+
+  it("recognizes known selectors from the lookup table", () => {
+    // 1inch swap selector — only in knownSelectors map, not in any ABI fragment
+    const data =
+      "0x12aa3caf" +
+      "0000000000000000000000000000000000000000000000000000000000000001";
+    const result = decodeTransaction({ ...basePayload, data });
+    expect(result.kind).toBe("contract-call");
+    if (result.kind === "contract-call") {
+      expect(result.method).toBe("swap");
+    }
   });
 });

@@ -1,11 +1,14 @@
+import { randomBytes } from "crypto";
 import { ml_dsa65 } from "@noble/post-quantum/ml-dsa.js";
+
+import { logWarn, logInfo } from "@/src/modules/observability/logger";
 
 /**
  * Production-grade PQC key management.
  *
  * Key sourcing priority:
  * 1. SENTINEL_PQC_SEED env var (hex-encoded 32-byte seed)
- * 2. Deterministic fallback seed (development only)
+ * 2. Auto-generated random seed (development only — signatures won't verify across restarts)
  *
  * In production, SENTINEL_PQC_SEED should be injected via:
  * - Kubernetes secrets
@@ -23,19 +26,19 @@ function getSeed(): Uint8Array {
     if (bytes.length !== 32) {
       throw new Error(`SENTINEL_PQC_SEED must be 32 bytes (64 hex chars), got ${bytes.length} bytes`);
     }
+    logInfo("pqc.seed.loaded", { source: "environment" });
     return new Uint8Array(bytes);
   }
 
-  // Development fallback — log warning
-  if (process.env.NODE_ENV === "production") {
-    console.warn(
-      "[PQC] WARNING: Using deterministic fallback seed. Set SENTINEL_PQC_SEED for production."
-    );
-  }
+  // No env seed — generate a cryptographically random seed for this process lifetime
+  const randomSeed = randomBytes(32);
+  logWarn("pqc.seed.generated", {
+    message:
+      "No SENTINEL_PQC_SEED env var set. Generated random PQC seed for this process. " +
+      "Signatures will NOT verify across restarts. Set SENTINEL_PQC_SEED for production.",
+  });
 
-  const fallback = new Uint8Array(32);
-  for (let i = 0; i < 32; i++) fallback[i] = i;
-  return fallback;
+  return new Uint8Array(randomSeed);
 }
 
 function getSystemKeys() {

@@ -7,7 +7,7 @@ import { enforceRateLimit } from "@/src/modules/security/rate-limit";
 
 const schema = z.object({
   verdict: z.enum(["correct", "false-positive", "false-negative"]),
-  notes: z.string().max(500).optional()
+  notes: z.string().max(500).optional(),
 });
 
 export async function POST(request: Request) {
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Authentication required" }, { status: 401 });
   }
 
-  const rate = enforceRateLimit(`feedback:${session.address}`, 20, 60_000);
+  const rate = await enforceRateLimit(`feedback:${session.address}`, 20, 60_000);
   if (!rate.allowed) {
     return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
   }

@@ -1,5 +1,7 @@
-import { createHmac, randomUUID, timingSafeEqual } from "crypto";
+import { createHmac, randomBytes, randomUUID, timingSafeEqual } from "crypto";
 import { verifyMessage } from "ethers";
+
+import { logWarn, logError, logInfo } from "@/src/modules/observability/logger";
 
 const memoryNonces = new Map<string, { nonce: string; expiresAt: number; issuedAt: number }>();
 
@@ -12,8 +14,37 @@ async function getPgNonces() {
   }
 }
 
-function tokenSecret() {
-  return process.env.AUTH_SECRET ?? "sentinel-auth-secret";
+/**
+ * Auth secret management. Priority:
+ * 1. AUTH_SECRET env var (production — must be set)
+ * 2. Auto-generated random secret (dev only — logged with warning)
+ */
+let _runtimeSecret: string | null = null;
+
+function tokenSecret(): string {
+  const envSecret = process.env.AUTH_SECRET;
+  if (envSecret && envSecret.length >= 32) {
+    return envSecret;
+  }
+
+  if (envSecret) {
+    logWarn("auth.secret.weak", {
+      message: "AUTH_SECRET is set but shorter than 32 characters. Use a stronger secret in production.",
+    });
+    return envSecret;
+  }
+
+  // No env secret — generate a random one for this process lifetime
+  if (!_runtimeSecret) {
+    _runtimeSecret = randomBytes(64).toString("hex");
+    logWarn("auth.secret.generated", {
+      message:
+        "No AUTH_SECRET env var set. Generated ephemeral secret for this process. " +
+        "Tokens will be invalidated on restart. Set AUTH_SECRET for production.",
+    });
+  }
+
+  return _runtimeSecret;
 }
 
 function safeEquals(left: string, right: string) {
@@ -58,13 +89,15 @@ export async function issueNonce(address: string) {
     try {
       await pgNonces.storeNonce(address, nonce, expiresAt);
       return nonce;
-    } catch { /* fall through */ }
+    } catch (e) {
+      logError("auth.nonce.pg_failed", e, { address });
+    }
   }
 
   memoryNonces.set(address.toLowerCase(), {
     nonce,
     expiresAt: expiresAt.getTime(),
-    issuedAt: Date.now()
+    issuedAt: Date.now(),
   });
   return nonce;
 }
@@ -82,9 +115,12 @@ export async function verifyWalletSignature(address: string, signature: string) 
         const recovered = verifyMessage(message, signature);
         if (recovered.toLowerCase() !== address.toLowerCase()) return null;
         await pgNonces.deleteNonce(address);
+        logInfo("auth.verified", { address, store: "postgres" });
         return signToken(address, nonce);
       }
-    } catch { /* fall through */ }
+    } catch (e) {
+      logError("auth.verify.pg_failed", e, { address });
+    }
   }
 
   // Fall back to in-memory
@@ -96,5 +132,6 @@ export async function verifyWalletSignature(address: string, signature: string) 
   if (recovered.toLowerCase() !== address.toLowerCase()) return null;
 
   memoryNonces.delete(address.toLowerCase());
+  logInfo("auth.verified", { address, store: "memory" });
   return signToken(address, record.nonce);
 }

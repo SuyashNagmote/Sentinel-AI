@@ -10,7 +10,8 @@ import { cn } from "@/src/lib/utils";
 
 const navLinks = [
   { href: "/", label: "Home" },
-  { href: "/dashboard", label: "Analysis" },
+  { href: "/dashboard", label: "Sandbox" },
+  { href: "/analytics", label: "Analytics" },
 ];
 
 export function SiteHeader() {
