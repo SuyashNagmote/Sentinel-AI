@@ -17,7 +17,7 @@ Users no longer have to sign blind transactions.
 
 Production prototype:
 
-`https://sentinel-ai-111885796030.asia-south1.run.app`
+https://sentinel-ai-111885796030.asia-south1.run.app
 
 This prototype is deployed on Google Cloud Run.
 
@@ -205,7 +205,7 @@ The project includes:
 
 Live prototype:
 
-`https://sentinel-ai-111885796030.asia-south1.run.app`
+https://sentinel-ai-111885796030.asia-south1.run.app
 
 ## Security Positioning
 
