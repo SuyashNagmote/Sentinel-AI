@@ -1,9 +1,10 @@
+import { config, isProd } from "@/src/lib/config";
+
 type LogLevel = "debug" | "info" | "warn" | "error";
 
 const LOG_LEVELS: Record<LogLevel, number> = { debug: 0, info: 1, warn: 2, error: 3 };
 
-const minLevel: LogLevel =
-  (process.env.LOG_LEVEL as LogLevel) ?? (process.env.NODE_ENV === "production" ? "info" : "debug");
+const minLevel: LogLevel = config.LOG_LEVEL ?? (isProd ? "info" : "debug");
 
 function shouldLog(level: LogLevel) {
   return LOG_LEVELS[level] >= LOG_LEVELS[minLevel];

@@ -1,3 +1,4 @@
+import { config } from "@/src/lib/config";
 import type {
   DecodedAction,
   RiskFinding,
@@ -65,7 +66,7 @@ export async function explainTransaction(input: {
   findings: RiskFinding[];
   severity: Severity;
 }): Promise<{ summary: string; usedGoogleAI: boolean }> {
-  if (!process.env.GEMINI_API_KEY) {
+  if (!config.GEMINI_API_KEY) {
     return {
       summary: localSummary(
         input.payload,
@@ -79,9 +80,9 @@ export async function explainTransaction(input: {
   }
 
   try {
-    const model = process.env.GEMINI_MODEL ?? "gemini-1.5-flash";
+    const model = config.GEMINI_MODEL;
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${config.GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: {

@@ -1,0 +1,29 @@
+{
+  "framework": "nextjs",
+  "functions": {
+    "app/api/analyze/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/sign/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/metrics/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/auth/verify/route.ts": {
+      "maxDuration": 15
+    },
+    "app/api/auth/nonce/route.ts": {
+      "maxDuration": 15
+    },
+    "app/api/feedback/route.ts": {
+      "maxDuration": 15
+    },
+    "app/api/health/route.ts": {
+      "maxDuration": 10
+    }
+  },
+  "env": {
+    "NEXT_TELEMETRY_DISABLED": "1"
+  }
+}
