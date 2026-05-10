@@ -18,8 +18,9 @@ Users no longer have to sign blind transactions.
 Production prototype:
 
 https://sentinel-ai-delta-gilt.vercel.app
+https://sentinel-ai-111885796030.asia-south1.run.app
 
-Deployed on Vercel.
+Deployed on Vercel and Google cloud
 
 ## Example Detection
 
@@ -131,7 +132,7 @@ This makes the system visibly intelligent and easy to trust.
 - AI: Google Gemini API
 - Crypto: ML-DSA-65 via `@noble/post-quantum`
 - ZK / Integrity: snarkjs, circomlibjs, Poseidon, Merkle commitments
-- Deployment: Vercel
+- Deployment: Vercel,Google Cloud
 
 ## Architecture Summary
 
@@ -198,10 +199,11 @@ A simple demo flow for reviewers:
 ## Deployment
 
 The project is deployed on Vercel. Environment variables are configured in the Vercel dashboard under Project → Settings → Environment Variables.
-
+It was also deployed on Google Cloud using Docker.
 Live prototype:
 
 https://sentinel-ai-delta-gilt.vercel.app
+https://sentinel-ai-111885796030.asia-south1.run.app
 
 ## Security Positioning
 
